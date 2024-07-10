@@ -6,6 +6,11 @@ import requests
 import threading
 import time
 from datetime import datetime
+#from testemail2 import osint_with_google_dorks, osint_with_google_dorks2, extract_domain, get_mx_records
+from email_osint import osint_with_google_dorks, osint_with_google_dorks2, extract_domain, get_mx_records
+import re  # Import the regex module
+import json
+
 
 twitter_url = 'https://spyboy.in/twitter'
 discord = 'https://spyboy.in/Discord'
@@ -13,8 +18,7 @@ website = 'https://spyboy.in/'
 blog = 'https://spyboy.blog/'
 github = 'https://github.com/spyboy-productions/unve1ler'
 
-
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 R = '\033[31m'  # red
 G = '\033[32m'  # green
@@ -26,6 +30,11 @@ current_date = datetime.now().date()
 formatted_date = current_date.strftime("%Y-%m-%d")
 TIMEOUT_SECONDS = 10
 
+# Function to validate an email address
+def is_valid_email(email):
+    pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    return re.match(pattern, email)
+
 banner = r'''                                                    
                          ____.__                
  __ __  _______  __ ____/_   |  |   ___________ 
@@ -34,7 +43,7 @@ banner = r'''
 |____/|___|  /\_/  \___  >___|____/\___  >__|   
            \/          \/              \/
         Revealing Digital Footprints and Visual Clues on the Internet.       
-                                                
+
 '''
 
 
@@ -190,14 +199,50 @@ def check_social_media(username, image_link=None):
         if url:
             print(f"{Y}{platform}: {G}{url}")
 
+    #print("\n-------------------------------------------------------\n")
+
     if image_link:
-        print(f'\n{W}[+] {C}Reverse Image Search URLs:\n')
-        print(f"{G}Google: {Y}https://lens.google.com/uploadbyurl?url={image_link}\n"
+        print(f'\n{W}[~] {C}Google Reverse Image Search:\n{W}')
+
+        url = "https://google-reverse-image-api.vercel.app/reverse"
+        data = {"imageUrl": f"{image_link}"}
+        response = requests.post(url, json=data)
+
+        if response.ok:
+            formatted_json = json.dumps(response.json(), indent=2)
+            print(formatted_json)
+        else:
+            print(response.status_code)
+
+
+        print(f'\n{W}[~] {C}Manual Link TO Reverse Image Search URLs:\n')
+
+        def shorten_url(url):
+            api_url = "http://tinyurl.com/api-create.php?url=" + url
+            response = requests.get(api_url)
+            return response.text
+
+        #image_link = "YOUR_IMAGE_LINK_HERE"
+
+        google_url = shorten_url(f"https://lens.google.com/uploadbyurl?url={image_link}")
+        bing_url = shorten_url(f"https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIVSP&sbisrc=UrlPaste&q=imgurl:{image_link}")
+        yandex_url = shorten_url(f"https://yandex.com/images/search?source=collections&&url={image_link}&rpt=imageview")
+        baidu_url = shorten_url(f"https://graph.baidu.com/details?isfromtusoupc=1&tn=pc&carousel=0&image={image_link}")
+
+        print(f"{G}Google: {Y}{google_url}\n"
+              f"{G}Bing: {Y}{bing_url}\n"
+              f"{G}Yandex: {Y}{yandex_url}\n"
+              f"{G}Baidu: {Y}{baidu_url}")
+
+
+        '''print(f"{G}Google: {Y}https://lens.google.com/uploadbyurl?url={image_link}\n"
               f"{G}Bing: {Y}https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIVSP&sbisrc=UrlPaste&q=imgurl:{image_link}\n"
               f"{G}Yandex: {Y}https://yandex.com/images/search?source=collections&&url={image_link}&rpt=imageview\n"
-              f"{G}Baidu: {Y}https://graph.baidu.com/details?isfromtusoupc=1&tn=pc&carousel=0&image={image_link}")
+              f"{G}Baidu: {Y}https://graph.baidu.com/details?isfromtusoupc=1&tn=pc&carousel=0&image={image_link}")'''
 
-    print("-------------------------------------------------------")
+
+
+    #print("\n-------------------------------------------------------\n")
 
 
 def main():
@@ -208,6 +253,18 @@ def main():
         print(f"{R}Error: Target username not provided.{W}")
         return
 
+    has_email = input(f"{Y}Do you have an email address for the target? (yes/no): ").lower()
+
+    if has_email == "yes":
+        target_email = input(f'{C}Target Email: ')
+
+        if not is_valid_email(target_email):
+            print(f"{R}Error: Invalid email address format.{W}")
+            return
+
+    else:
+        target_email = None
+
     response = input(f"{Y}Do you have any image of the target? (yes/no): ").lower()
 
     if response == "yes":
@@ -217,7 +274,7 @@ def main():
             response = requests.get(image_link, timeout=5)
 
             if response.status_code == 200:
-                print(f'{W}Reverse image URL will be printed in the end.')
+                print(f'\n{W}Reverse image URL will be printed later.')
 
             else:
                 print("Invalid image link.")
@@ -230,8 +287,33 @@ def main():
     else:
         image_link = None
 
-    print(f'{Y}[+] {G}Searching profiles...')
+    print(f'\n{Y}[+] {C}Searching profiles...\n')
     check_social_media(target_username, image_link)
+
+    if target_email:
+        # Perform email OSINT
+        print(f'\n{W}[~] {C}Performing email OSINT...\n')
+
+        domain = extract_domain(target_email)
+        if domain:
+            print(f"\n{R}Email Address: {W}{target_email}")
+            print(f"{R}Email Domain: {W}{domain}")
+
+            mx_records = get_mx_records(domain)
+            if mx_records:
+                print(f"\n{Y}Mail Exchanger (MX) Records:")
+                for mx in mx_records:
+                    print(f"{W}  - {mx}")
+            else:
+                print("No MX records found for the domain.")
+        else:
+            print("Invalid email address format.")
+
+        # Perform extensive OSINT on the email address using Google dorks
+
+        osint_with_google_dorks(target_email, domain)
+        osint_with_google_dorks2(target_email)
+
 
 if __name__ == "__main__":
     main()
